@@ -1,0 +1,75 @@
+sudo mkdir /opt/graphite
+sudo apt-get install python-virtualenv
+sudo apt-get install python-cairo
+sudo apt-get install libcairo2-dev
+sudo apt-get install python-dev
+sudo chown user:user /opt/graphite
+virtualenv /opt/graphite
+cd /opt/graphite
+rm lib/python2.7/no-global-site-packages.txt
+source bin/activate
+pip install whisper
+pip -v install carbon
+pip -v install graphite-web carbon whisper django django-tagging uwsgi 
+cp /opt/graphite/conf/carbon.conf.example /opt/graphite/conf/carbon.conf
+cp /opt/graphite/conf/storage-schemas.conf.example /opt/graphite/conf/storage-schemas.conf
+cd webapp/graphite
+mv local_settings.py.example local_settings.py
+vim local_settings.py
+python manage.py syncdb
+cd ../../
+
+### testing
+bin/carbon-cache.py start
+uwsgi --http localhost:8085 --master --processes 4 --home /opt/graphite --pythonpath /opt/graphite/webapp/graphite --wsgi-file=/opt/graphite/conf/graphite.wsgi.example
+###
+
+
+sudo apt-get install apache2 libapache2-mod-wsgi
+
+cp /opt/graphite/conf/graphite.wsgi.example /opt/graphite/conf/graphite.wsgi
+
+% diff -Nru /opt/graphite/conf/graphite.wsgi /opt/graphite/conf/graphite.wsgi.example
+--- /opt/graphite/conf/graphite.wsgi    2013-01-27 15:06:47.000000000 +0100
++++ /opt/graphite/conf/graphite.wsgi.example    2013-01-25 21:27:48.000000000 +0100
+@@ -1,4 +1,4 @@
+-import os, sys, site
++import os, sys
+ sys.path.append('/opt/graphite/webapp')
+ os.environ['DJANGO_SETTINGS_MODULE'] = 'graphite.settings'
+ 
+@@ -14,4 +14,3 @@
+ from graphite.logger import log
+ log.info("graphite.wsgi - pid %d - reloading search index" % os.getpid())
+ import graphite.metrics.search
+-site.addsitedir('/opt/graphite/lib/python2.7/site-packages')
+
+
+sudo cp /opt/graphite/examples/example-graphite-vhost.conf /etc/apache2/sites-available/graphite
+
+% diff -Nru /etc/apache2/sites-available/graphite /opt/graphite/examples/example-graphite-vhost.conf
+--- /etc/apache2/sites-available/graphite       2013-01-27 15:19:39.000000000 +0100
++++ /opt/graphite/examples/example-graphite-vhost.conf  2013-01-25 21:27:48.000000000 +0100
+@@ -17,7 +17,7 @@
+ 
+ # XXX You need to set this up!
+ # Read http://code.google.com/p/modwsgi/wiki/ConfigurationDirectives#WSGISocketPrefix
+-WSGISocketPrefix /var/run/apache2/wsgi
++WSGISocketPrefix run/wsgi
+ 
+ <VirtualHost *:80>
+         ServerName graphite
+
+sudo mkdir /var/run/apache2/wsgi
+sudo chown www-data /var/run/apache2/wsgi
+
+sudo vim /etc/apache2/mods-available/wsgi.conf
+
+        WSGISocketPrefix /var/run/apache2/wsgi
+
+        WSGIPythonHome /opt/graphite
+
+
+sudo /etc/init.d/apache2 restart
+
+
